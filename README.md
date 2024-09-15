@@ -108,7 +108,7 @@ Waiting for DSS backend to start ......
 - Due to permission issues related to "Data Scientist" profile needed, here is previewing and pre-building the entire flow
 ![flow](flow.png)
 
-For more info on Flow, visit [concept-flow](https://knowledge.dataiku.com/latest/getting-started/dataiku-ui/concept-flow.html)
+For more info on Flow, visit [Concept-Flow](https://knowledge.dataiku.com/latest/getting-started/dataiku-ui/concept-flow.html)
 
 ### Installation of R and R-integration
 
@@ -123,3 +123,97 @@ For more info on Flow, visit [concept-flow](https://knowledge.dataiku.com/latest
 **Check point**: In the TShirts project, change the connection of the managed datasets to the new Azure Blob Storage connection
 
 - 
+
+For more info on dataset connection changes, visit [Connection Changes](https://knowledge.dataiku.com/latest/data-sourcing/connections/concept-connection-changes.html)
+
+
+## Exercise 3 - Connect DSS instance to AKS cluster using AKS plugin
+
+
+## Exercise 4 - Expose DSS on HTTPS port
+
+To enable HTTPS connections to the DSS instance, here are steps taken:
+
+- In Generate a SSL server certificate and private key file using openssl `openssl req -newkey rsa:4096  -x509  -sha512  -days 365 -nodes -out certificate.pem -keyout privatekey.pem`
+- Edit the `install.ini` file to have SSL configs with the paths to the cert.pem and privatekey.key
+```
+[server]
+port = 11200
+ssl = true
+ssl_certificate = /home/khun/INSTALL_DIR/certificate.pem
+ssl_certificate_key = /home/khun/INSTALL_DIR/privatekey.key
+ssl_ciphers = recommended
+```
+- In the DATA_DIR directory, stop the DSS instance `./bin/dss stop`
+- Re-generate DSS config with the new SSL settings `./bin/dssadmin regenerate-config`
+- Restart the DSS instance `./bin/dss start`
+
+With the self-signed certificate, web browsers do not recognize it as a valid ssl cert and who a warning to visitors that the web site cert cannot be verified. Hence the connection is not secured
+
+![https](https.png)
+
+Another way to configure HTTPS connection to the DSS instance is to use nginx as a reverse proxy server:
+
+- Make sure nginx and epel-release installed `sudo yum install nginx && sudo yum install epel-release`
+- Start nginx `sudo systemctl start nginx` and check the status of it `sudo systemctl status nginx.service`. You should see something like: 
+
+```
+● nginx.service - The nginx HTTP and reverse proxy server
+   Loaded: loaded (/usr/lib/systemd/system/nginx.service; disabled; vendor preset: disabled)
+   Active: active (running) since Sun 2024-09-15 19:17:41 UTC; 41s ago
+  Process: 1710 ExecStart=/usr/sbin/nginx (code=exited, status=0/SUCCESS)
+  Process: 1707 ExecStartPre=/usr/sbin/nginx -t (code=exited, status=0/SUCCESS)
+  Process: 1705 ExecStartPre=/usr/bin/rm -f /run/nginx.pid (code=exited, status=0/SUCCESS)
+ Main PID: 1712 (nginx)
+   CGroup: /system.slice/nginx.service
+           ├─1712 nginx: master process /usr/sbin/nginx
+           ├─1713 nginx: worker process
+           ├─1714 nginx: worker process
+           ├─1715 nginx: worker process
+           └─1716 nginx: worker process
+
+Sep 15 19:17:41 candidate-khun-phat-assessment-vm systemd[1]: Starting The nginx HTTP and reverse proxy server...
+Sep 15 19:17:41 candidate-khun-phat-assessment-vm nginx[1707]: nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+Sep 15 19:17:41 candidate-khun-phat-assessment-vm nginx[1707]: nginx: configuration file /etc/nginx/nginx.conf test is successful
+Sep 15 19:17:41 candidate-khun-phat-assessment-vm systemd[1]: Started The nginx HTTP and reverse proxy server.
+```
+
+- Set it to start on boot `sudo systemctl enable nginx`
+
+- Add ssl settings to the /etc/nginx/nginx.conf file:
+```
+server {
+    # Host/port on which to expose Data Science Studio to users
+    listen 443 ssl;
+    server_name 40.117.85.172;
+    ssl_certificate /etc/nginx/ssl/certificate.pem;
+    ssl_certificate_key /etc/nginx/ssl/privatekey.key;
+    location / {
+        # Base url of the Data Science Studio installation
+        proxy_pass http://40.117.85.172:11200/;
+        proxy_redirect http://40.117.85.172 https://40.117.85.172;
+        proxy_redirect http://40.117.85.172 https://40.117.85.172;
+        # Allow long queries
+        proxy_read_timeout 3600;
+        proxy_send_timeout 600;
+        # Allow large uploads
+        client_max_body_size 0;
+        # Allow large downloads
+        proxy_max_temp_file_size 0;
+        # Allow protocol upgrade to websocket
+        proxy_http_version 1.1;
+        proxy_set_header Host $http_host;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+
+- Restart nginx service `sudo systemctl restart nginx`
+
+For more info on configruing host to accept HTTPS, visit [HTTPS config](https://doc.dataiku.com/dss/latest/installation/custom/advanced-customization.html) and [Reverse Proxy](https://doc.dataiku.com/dss/latest/installation/custom/reverse-proxy.html)
+
+## Exercise 5 - Running Managed Spark on AKS cluster and Integrate with Azure Blog Storage
+
+## Exercise 6 - User Isolation (UIF) Activation on DSS 
