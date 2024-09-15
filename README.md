@@ -101,7 +101,7 @@ Waiting for DSS backend to start ......
 
 - Click on the grid dots near next to the search bar and browse projects
 ![grid-dots](grid-dots.png)
-- Click  NEW PROJECT and select Sample projects
+- Click NEW PROJECT and select Sample projects
 ![sample-projects](sample-projects.png)
 - Select Dataiku TShirts project
 ![tshirt](tshirt-proj.png)
