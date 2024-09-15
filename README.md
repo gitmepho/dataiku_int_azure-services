@@ -130,7 +130,7 @@ For more info on dataset connection changes, visit [Connection Changes](https://
 ## Exercise 3 - Connect DSS instance to AKS cluster using AKS plugin
 
 
-## Exercise 4 - Expose DSS on HTTPS port
+## Exercise 4 - Expose DSS on HTTPS
 
 To enable HTTPS connections to the DSS instance, here are steps taken:
 
