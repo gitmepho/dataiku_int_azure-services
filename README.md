@@ -109,7 +109,7 @@ Waiting for DSS backend to start ......
 ![user](user-profile.png)
 - To build the entire flow, select Build all in FLOW ACTIONS and select Force-rebuild all dependencies and click BUILD
 ![build-all](build-all-entireflow.png)
-- Go to the Jobs (play button) and the build
+- Go to the Jobs (play button) and run the build
 ![run build](run-build.png)
 
 For more info on Flow, visit [Concept-Flow](https://knowledge.dataiku.com/latest/getting-started/dataiku-ui/concept-flow.html)
@@ -139,9 +139,8 @@ For more info on dataset connection changes, visit [Connection Changes](https://
 
 ## Exercise 3 - Connect DSS instance to AKS cluster using AKS plugin
 
-**Check point**: In the TShirts project, create a simple Python recipe and run it in a container
+Initial setup will include installing tools such as  `az`, `docker`, and `kubectl` and AKS plugin from the Plugins store in Dataiku DSS.
 
-- Initial setup will include installing tools such as  `az`, `docker`, and `kubectl` and AKS plugin from the Plugins store in Dataiku DSS.
 - To install the AKS plugin, head to the Dataiku dashboard, click on the grid dots, select Plugins, search for the AKS plugin, click install.
 ![aks-plugin](aks-plugin.png)
 
@@ -238,6 +237,9 @@ Traceback (most recent call last):
     raise Exception("Command failed: %s - code %s" % (cmd, retcode))
 Exception: Command failed: ['docker', 'build', '-t', 'dku-exec-base-emdmyufhkc9yirrx5rekxdzk:dss-12.2.3', '/home/khun/DATA_DIR/tmp/exec-docker-base-image.dkjyfrvj'] - code 1
 ```
+
+**Check point**: In the TShirts project, create a simple Python recipe and run it in a container
+ADD SCREENSHOTS HERE!!!!!
 
 For more info, visit [Managed AKS](https://doc.dataiku.com/dss/latest/containers/aks/managed.htm)
 
