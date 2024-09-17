@@ -1,5 +1,5 @@
 # Dataiku Installation and Integrations with Azure Services
-This repo stores information on how to install Dataiku DSS on an Azure instance, integrate it with other Azure services such as Blob Storage and AKS cluster.
+This repository stores information and steps on how to install and configure Dataiku DSS on an Azure instance, and integrate it with other Azure services such as Blob Storage and AKS K8S cluster.
 
 ## Excercise 1 - Install a DSS instance (Design Node) - Install with port 11200
 Given the SSH details to the Azure instance, here are the steps taken to complete excercise 1.
@@ -473,26 +473,31 @@ For more info on configruing host to accept HTTPS, visit [HTTPS config](https://
 ![failedSpark](sparkjobsfailed.png)
 - Resolved by changing the name of the Spark config to default. Adminstration > Settings > under COMPUTE & SCALING > Spark.
 ![sparkconfigname](sparkconfigname.png)
-- Rerun Spark jobs and saw that all Jobs are running as pods the cluster:
+- Rerun Spark jobs and saw that all Jobs are running as pods in the cluster:
 ![sparkpods](sparkpods.png) ![sparkjoblogs](sparkjoblogs.png)
 
 For more info on Spark configs, visit https://doc.dataiku.com/dss/latest/containers/setup-k8s.html#optional-setup-spark
 
 ## Exercise 6 - User Isolation (UIF) Activation on DSS 
 
-stop dss
-login back in as admin and sudo su - (root)
-then ./bin/dssadmin install-impersonation khun (show screenshots)
-As root, edit the /etc/dataiku-security/INSTALL_ID/security-config.ini file. In the [users] section, fill in the allowed_user_groups settings with the list of UNIX groups that your end users belong to. Only users belonging to these groups will be allowed to use the local code impersonation mechanism.
+To initialize UIF, here are the steps taken: 
 
-configure identity mapping 
+- Stop DSS from DATA_DIR `./bin/dss stop`
+- Login back in as admin and login as root `sudo su -`
+- Then installing imperonsonation script `./bin/dssadmin install-impersonation khun`:
+![uif-initialize](uif-initialize.png)
+- Logged in as root, edit  `/etc/dataiku-security/INSTALL_ID/security-config.ini` file. Under the `[users]` section, add  assessment_admin group to `allowed_user_groups` setting:
+![addkhunusergroup](addkhunusergroup.png)
+- Configure identity mapping on DSS to have DSS login user `admin` mapped to my unix user `khun` - Adminstration > Settings > under SECURITY & AUDIT > Other security settings:
+![UIFsettings](UIF-dss-config.png)
+- After configuring identitiy mapping, rebuilding the jobs and failed due to filesystem issue - stating that running sudo requires a password:
+![uif-filesystemissue](uif-filesystem-issue.png)
+- To resolve filesystem permission issue, login as root and modify `khun` user setting at the end of the sudoer's file to have no password `visudo` and add `khun ALL=(ALL) NOPASSWD:ALL`.
+- The `dssadmin install-impersonation` did not set up 711 permission correctly on `/home/khun/DATA_DIR`, so logged in as root, I had to change file permission in DATA_DIR `chmod -R 711 /home/khun/DATA_DIR`. For more info on chmod usage, visit https://gps.uml.edu/tutorials/unix-linux/unix/chmod.htm 
+- Rebuilding the jobs and was successful. Below log shows the impersonation was fixed after correcting the sudoer's file and changing file permission in DATA_DIR:
+![uif-fixed](UIF-fixed.png)
 
-after configuring identitiy mapping, rebuilding the job and failed (show screenshots)
-trying to resolove file  system permission issue  
-as root, modify the khun user setting to have no password `khun ALL=(ALL) NOPASSWD:ALL`
-rebuilding the job 
-
-For more info, visit [UIF](https://doc.dataiku.com/dss/latest/user-isolation/initial-setup.html)
+For more info on setting up UIF: https://doc.dataiku.com/dss/latest/user-isolation/initial-setup.html and concepts on User Isolation Framework (UIF) visit: https://doc.dataiku.com/dss/latest/user-isolation/concepts.html
 
 
 
