@@ -221,14 +221,19 @@ az acr login --name khunphatacr.azurecr.io
 The login server endpoint suffix '.azurecr.io' is automatically omitted.
 Login Succeeded
 ```
-- Build the base image following steps from [k8s-base-image](https://doc.dataiku.com/dss/latest/containers/setup-k8s.html#k8s-base-image)
+- Build the base image in `DATA_DIR` directory following steps from [k8s-base-image](https://doc.dataiku.com/dss/latest/containers/setup-k8s.html#k8s-base-image)
 
 ```
-/bin/dssadmin build-base-image --type container-exec
+./bin/dssadmin build-base-image --type container-exec
 
 ```
-Ran into issues:
+Ran into building base image issues:
 ```
+#8 1.594 Could not retrieve mirrorlist http://mirrorlist.centos.org/?release=7&arch=x86_64&repo=os&infra=container error was
+#8 1.594 14: curl#6 - "Could not resolve host: mirrorlist.centos.org; Unknown error"
+
+#8 1.597 Cannot find a valid baseurl for repo: base/7/x86_64
+
 ERROR: failed to solve: process "/bin/sh -c yum -y update     && yum -y install epel-release     && . /etc/os-release && case \"$VERSION_ID\" in         7*) yum -y install procps python3-devel python-devel;;         8*) yum -y install procps-ng python36-devel glibc-langpack-en python2-devel;;         *) echo 2>&1 'OS version not supported'; exit 1;;        esac     && yum -y install curl util-linux bzip2 nginx expat zip unzip freetype libgfortran libgomp libicu-devel libcurl-devel openssl-devel libxml2-devel       && yum -y groupinstall \"Development tools\"     && yum -y autoremove     && yum clean all" did not complete successfully: exit code: 1
 Traceback (most recent call last):
   File "/home/khun/INSTALL_DIR/dataiku-dss-12.2.3/resources/container-exec/build-images.py", line 1112, in <module>
@@ -238,8 +243,132 @@ Traceback (most recent call last):
 Exception: Command failed: ['docker', 'build', '-t', 'dku-exec-base-emdmyufhkc9yirrx5rekxdzk:dss-12.2.3', '/home/khun/DATA_DIR/tmp/exec-docker-base-image.dkjyfrvj'] - code 1
 ```
 
+Based on the logs and some research, it seems to be [CentOS 7 end of life](https://support.hcltechsw.com/community?id=community_blog&sys_id=98f8b04387c742145440c9d8cebb3500) issues. To resolve it, I checked the options for `dssadmin` to see if I can pass in any other linux distributions, then I see this:
+
+```
+  --distrib {centos7,almalinux8}
+                        [mode=build only] Base distribution to use when
+                        building from scratch
+```
+I passed in `--distrib` to use almalinux8 distribution `./bin/dssadmin build-base-image --type container-exec --distrib almalinux8` still failed:
+
+```
+ERROR: failed to solve: process "/bin/sh -c build/install-packages-builtin.sh R ${DKU_R_LIB_SUBPATH} build/minimal-packages-base.txt https://cloud.r-project.org" did not complete successfully: exit code: 1
+Traceback (most recent call last):
+  File "/home/khun/INSTALL_DIR/dataiku-dss-12.2.3/resources/container-exec/build-images.py", line 1112, in <module>
+    run_wait_check(docker_cmd)
+  File "/home/khun/INSTALL_DIR/dataiku-dss-12.2.3/resources/container-exec/build-images.py", line 927, in run_wait_check
+    raise Exception("Command failed: %s - code %s" % (cmd, retcode))
+Exception: Command failed: ['docker', 'build', '-t', 'dku-exec-base-emdmyufhkc9yirrx5rekxdzk:dss-12.2.3', '/home/khun/DATA_DIR/tmp/exec-docker-base-image.czi971h_'] - code 1
+```
+Another route to get the base image, is to download tar file from the repository same where the Dataiku installer is `wget https://downloads.dataiku.com/public/studio/12.2.3/container-images/dataiku-dss-ALL-base_dss-12.2.3-almalinux8-r4-py3.9.tar.gz` and load the docker image `docker load -i dataiku-dss-ALL-base_dss-12.2.3-almalinux8-r4-py3.9.tar.gz`
+
+Ran into the disk running out of space:
+```
+df03097acf65: Loading layer [==================================================>]  275.5MB/275.5MB
+8ae2d4ba041e: Loading layer [==================================================>]  4.096kB/4.096kB
+9bec5a59d6a1: Loading layer [=====================================>             ]  934.7MB/1.254GB
+open /usr/share/texlive/texmf-dist/fonts/afm/public/cm-super/sfbso10.afm.gz: no space left on device
+```
+To resolove the spacing issue, mount the extra disk `sudo mkfs.xfs /dev/sdc && sudo mount /dev/sdc /mnt/data` and move the docker data to use the new mounted disk:
+```
+sudo mkidr -p /mnt/data/docker  #make docker dir in new disk
+sudo rsync -aP /var/lib/docker/ /mnt/data/docker/   #move docker data to new location
+sudo mv /var/lib/docker /var/lib/docker.bak   #back old docker dir
+sudo ln -s /mnt/data/docker /var/lib/docker   #create symbolic link to new location
+sudo systemctl start docker
+```
+- Rerun the docker load command `docker load -i dataiku-dss-ALL-base_dss-12.2.3-almalinux8-r4-py3.9.tar.gz` then you should see the docker images:
+
+```
+docker images
+
+REPOSITORY                        TAG                              IMAGE ID       CREATED         SIZE
+dataiku-dss-apideployer-base      dss-12.2.3-almalinux8-r4-py3.9   2cfff5691ca6   11 months ago   5.02GB
+dataiku-dss-spark-exec-base       dss-12.2.3-almalinux8-r4-py3.9   4dbfa6682fdd   11 months ago   5.06GB
+dataiku-dss-container-exec-base   dss-12.2.3-almalinux8-r4-py3.9   0b1a67df0fce   11 months ago   4.25GB
+```
+
+- Create a new containerized execution config on the dashboard
+![containerconfigissues](container-exec-config-error.png)
+
+Ran into image naming issues since I did not build it sucessfully and went with downloading the base image from source. I believe to resolve this issue, I have retag the image. `docker tag dataiku-dss-container-exec-base:dss-12.2.3-almalinux8-r4-py3.9 dku-exec-base-emdmyufhkc9yirrx5rekxdzk:dss-12.2.3` After the image retagged, I was able to test out the container on dashboard and push the image:
+
+![afterImageRetagged](after-retagged.png)
+
+![pushed](image-pushed.png)
+
+- Setup AKS connection in the plugin setting
+![setting](AKSconnection.png)
+
+- Setup AKS Cluster Identity 
+![svcPrincipal](svcPrincipal.png)
+
+- Setup AKS Node Pools 
+![ClusterNodes](aksnodes.png)
+
+- Now that we have setup the AKS connections and settings in the plugin, We're going to create the AKS cluster following this [managed-k8s](https://doc.dataiku.com/dss/latest/containers/managed-k8s-clusters.html)  - Go to Adminstration > Clusters > CREATE AKS CLUSTER. Fill in the network details and click START.
+
+Ran into Python SKD is being too old:
+![aks-failed](aks-failed.png)
+
+Tried to rebuild the code env to have new python sdk, but ran into another issue: 
+
+![pythonissue](python-not-in-path.png)
+
+To resolve the python3.7 issue:
+
+```
+cd /usr/src
+sudo wget https://www.python.org/ftp/python/3.7.12/Python-3.7.12.tgz
+sudo tar xzf Python-3.7.12.tgz
+cd Python-3.7.12
+sudo ./configure --enable-optimizations
+sudo make altinstall
+
+python3.7 --version
+
+Python 3.7.12
+```
+Reran the code environment build and it succeeded with warnings:
+
+![codeenvRebuild](code-envRebuild.png)
+
+Failed to start AKS cluster again due to missing the `_ctypes` module. Had to reinstall python3.7 and here the steps following this link https://community.dataiku.com/discussion/24906/python-3-7-code-env-creation-issue:
+
+```
+sudo yum groupinstall "Development Tools"
+sudo yum install openssl-devel zlib-devel bzip2-devel openssl-devel ncurses-devel sqlite-devel readline-devel tk-devel gdbm-devel xz-devel
+
+sudo ./configure --enable-optimization
+sudo make altinstall
+```
+- After reinstalling pything and all the dependencies, had to re-install the AKS plugin, and re-create the cluster with below details and start the AKS cluster:
+![AKS-Running](AKS-running-status.png)
+
+For figuring out the subnet range and picking the right DNS IP, I used this [visual subnet calculator](https://www.davidc.net/sites/default/subnets/subnets.html)
+
 **Check point**: In the TShirts project, create a simple Python recipe and run it in a container
-ADD SCREENSHOTS HERE!!!!!
+
+- After the AKS cluster was able to start, we now can create a simple Python recipe. Go to Adminstration > Code Envs > NEW PYTHON ENV and configure Code Env and make sure Containerized execution setting is correct:
+
+![codeenvContainerExec](code-env-exe-config.png)
+
+- Pick a flow in the Tshirts project, and add new Python recipe and configure the output:
+
+![python-recipe](python-recipe.png)
+
+- Go to Recipes, and configure Advanced setting in the Container Configuration to use the previously Containerized Exec config:
+
+![container-config-pyRecipe](container-config-pyRecipe.png)
+
+- In the recipe setting page, go to Code, and click RUN
+
+![pyCodeRun](pythoncode.png)
+
+- Head to Adminstration > Clusters > select cluster > Monitoring, then we can see the Python recipe job running as a pod in the cluster:"
+
+![runningPyRecipe](runningPyRecipe.png)
 
 For more info, visit [Managed AKS](https://doc.dataiku.com/dss/latest/containers/aks/managed.htm)
 
@@ -329,4 +458,34 @@ For more info on configruing host to accept HTTPS, visit [HTTPS config](https://
 
 ## Exercise 5 - Running Managed Spark on AKS cluster and Integrate with Azure Blog Storage
 
+download tar of spark
+install it using  dssadmin
+start dss back 
+setup spark config and got basic spark configs from online
+push image, but got error
+docker tag image 
+docker push spark image via ui 
+go to the tshirt flow 
+click on all yellow brooms (datasets) and change to spark engine
+after build all flow (force rebuild dep)
+faced issues with running spark jobs
+solved by changing the name of the config to default
+re run spark jobs and show that pods are runnings in the cluster (screenshots)
+
 ## Exercise 6 - User Isolation (UIF) Activation on DSS 
+
+following this link https://doc.dataiku.com/dss/latest/user-isolation/initial-setup.html
+stop dss
+login back in as admin and sudo su - (root)
+then ./bin/dssadmin install-impersonation khun (show screenshots)
+As root, edit the /etc/dataiku-security/INSTALL_ID/security-config.ini file. In the [users] section, fill in the allowed_user_groups settings with the list of UNIX groups that your end users belong to. Only users belonging to these groups will be allowed to use the local code impersonation mechanism.
+
+configure identity mapping 
+
+after configuring identitiy mapping, rebuilding the job and failed (show screenshots)
+trying to resolove file  system permission issue  
+as root, modify the khun user setting to have no password `khun ALL=(ALL) NOPASSWD:ALL`
+rebuilding the job 
+
+
+
