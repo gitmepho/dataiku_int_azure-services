@@ -458,23 +458,28 @@ For more info on configruing host to accept HTTPS, visit [HTTPS config](https://
 
 ## Exercise 5 - Running Managed Spark on AKS cluster and Integrate with Azure Blog Storage
 
-download tar of spark
-install it using  dssadmin
-start dss back 
-setup spark config and got basic spark configs from online
-push image, but got error
-docker tag image 
-docker push spark image via ui 
-go to the tshirt flow 
-click on all yellow brooms (datasets) and change to spark engine
-after build all flow (force rebuild dep)
-faced issues with running spark jobs
-solved by changing the name of the config to default
-re run spark jobs and show that pods are runnings in the cluster (screenshots)
+- Stop the DSS from DATA_DIR `./bin/dss stop`
+- Download tarball of Spark standalone `wget https://downloads.dataiku.com/public/studio/12.2.3/dataiku-dss-spark-standalone-12.2.3-3.4.1-generic-hadoop3.tar.gz`
+- Install it `./bin/dssadmin install-spark-integration -standaloneArchive dataiku-dss-spark-standalone-12.2.3-3.4.1-generic-hadoop3.tar.gz -forK8S`
+- Start dss back up from DATA_DIR `./bin/dss start`
+- Setup Spark config on DSS and got basic Spark configs from: https://spark.apache.org/docs/latest/configuration.html
+![sparkconfig](sparkconfig.png)
+- Tried to push Spark base image but got some error stating the image not found. Since I skipped building the image locally, had to retag the image from the images from the previous step of docker load from the tar. `docker tag dataiku-dss-spark-exec-base:dss-12.2.3-almalinux8-r4-py3.9 dku-spark-base-emdmyufhkc9yirrx5rekxdzk:dss-12.2.3`
+- After retagging Spark image, pushing Spark image via ui was successful:
+![sparkimagepush](sparkimagepush.png)
+- Go to TShirts flow and change all flows to use Spark engine:
+![sparkengine](sparkengine.png)
+- After configuruing Spark engines, build all flows (force rebuild deps). Ran into issues with running Spark jobs 
+![failedSpark](sparkjobsfailed.png)
+- Resolved by changing the name of the Spark config to default. Adminstration > Settings > under COMPUTE & SCALING > Spark.
+![sparkconfigname](sparkconfigname.png)
+- Rerun Spark jobs and saw that all Jobs are running as pods the cluster:
+![sparkpods](sparkpods.png) ![sparkjoblogs](sparkjoblogs.png)
+
+For more info on Spark configs, visit https://doc.dataiku.com/dss/latest/containers/setup-k8s.html#optional-setup-spark
 
 ## Exercise 6 - User Isolation (UIF) Activation on DSS 
 
-following this link https://doc.dataiku.com/dss/latest/user-isolation/initial-setup.html
 stop dss
 login back in as admin and sudo su - (root)
 then ./bin/dssadmin install-impersonation khun (show screenshots)
@@ -486,6 +491,8 @@ after configuring identitiy mapping, rebuilding the job and failed (show screens
 trying to resolove file  system permission issue  
 as root, modify the khun user setting to have no password `khun ALL=(ALL) NOPASSWD:ALL`
 rebuilding the job 
+
+For more info, visit [UIF](https://doc.dataiku.com/dss/latest/user-isolation/initial-setup.html)
 
 
 
