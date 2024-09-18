@@ -4,7 +4,7 @@ This repository stores information and steps on how to install and configure Dat
 ## Excercise 1 - Install a DSS instance (Design Node) - Install with port 11200
 Given the SSH details to the Azure instance, here are the steps taken to complete excercise 1.
 
-- SSH into the Azure VM using the Admin username and password `ssh assessment_admin@40.117.85.172`
+- SSH into the Azure VM using the Admin username and password `ssh assessment_admin@server-ip`
 - After logged in, make sure to login as yourself instead of the admin account (If you don't see yourself as a user by checking `less /etc/passwd`, create a user and choose the password `sudo adduser -m khun && sudo passwd khun`). `-m` creates the home directory for myself.
 - Switch user to myself when performing the installation `su khun`. Verify myself to make sure I'm logged in properly `id` and output should look like this `uid=1001(khun) gid=1001(khun) groups=1001(khun) context=unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023`
 - Create 2 directories for the DSS installation. `INSTALL_DIR` for the downloaded DSS tar.gz and `DATA_DIR` for the configs of Dataiku DSS (datasets, recipes, insights, models, log files, etc.) `mkdir INSTALL_DIR DATA_DIR`
@@ -90,7 +90,7 @@ DSS started, pid=22436
 Waiting for DSS backend to start ......
 ```
 
-- I can now head to the UI: http://40.117.85.172:11200/. Should see something like this:
+- I can now head to the UI: http://server-ip:11200/. Should see something like this:
 
 ![dashboard](screenshots/dashboard.png)
 
@@ -427,14 +427,14 @@ Sep 15 19:17:41 candidate-khun-phat-assessment-vm systemd[1]: Started The nginx 
 server {
     # Host/port on which to expose Data Science Studio to users
     listen 443 ssl;
-    server_name 40.117.85.172;
+    server_name server-ip;
     ssl_certificate /etc/nginx/ssl/certificate.pem;
     ssl_certificate_key /etc/nginx/ssl/privatekey.key;
     location / {
         # Base url of the Data Science Studio installation
-        proxy_pass http://40.117.85.172:11200/;
-        proxy_redirect http://40.117.85.172 https://40.117.85.172;
-        proxy_redirect http://40.117.85.172 https://40.117.85.172;
+        proxy_pass http://DSS_HOST:DSS_PORT/;
+        proxy_redirect http://$proxy_host https://$host;
+        proxy_redirect http://$host https://$host;
         # Allow long queries
         proxy_read_timeout 3600;
         proxy_send_timeout 600;
@@ -498,6 +498,3 @@ To initialize UIF, here are the steps taken:
 ![uif-fixed](screenshots/UIF-fixed.png)
 
 For more info on setting up UIF, visit [UIF setup](https://doc.dataiku.com/dss/latest/user-isolation/initial-setup.html) and concepts on User Isolation Framework (UIF) visit: [UIF Concepts](https://doc.dataiku.com/dss/latest/user-isolation/concepts.html)
-
-
-
